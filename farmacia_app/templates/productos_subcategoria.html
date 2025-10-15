@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Productos en {{ subcategoria }}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+
+<body>
+ <!-- Contenedor principal -->
+<div class="contenedor_header">
+      <header class="bg-primary py-5 position-relative">
+      <div class="container text-center">
+        <h1 class="display-2 fw-bold text-white">Santa Rosa</h1>
+      </div>
+
+      <!-- Iconos de usuario y carrito en la esquina superior derecha -->
+      <div class="position-absolute top-0 end-0 p-3 d-flex align-items-center gap-3 z-3">
+        <!-- Ícono de usuario con menú desplegable -->
+        <div class="dropdown">
+          <a href="#" class="text-white fs-4" id="usuarioDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Usuario">
+            <i class="bi bi-person-circle"></i>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end mt-2" aria-labelledby="usuarioDropdown">
+            {% if session.get('usuario') %}
+              <li><a href="{{ url_for('index') }}" class="dropdown-item">Inicio</a></li>
+              </li>
+              <li><a class="dropdown-item" href="{{ url_for('logout') }}">Cerrar sesión</a></li>
+            {% else %}
+              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">Iniciar sesión</a></li>
+              <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#signupModal">Crear cuenta</a></li>
+            {% endif %}
+          </ul>
+        </div>
+
+
+        
+
+        <!-- Modal para editar perfil -->
+        <div class="modal fade" id="editarPerfilModal" tabindex="-1" aria-labelledby="editarPerfilLabel" aria-hidden="true">
+          <div class="modal-dialog">
+            <form method="POST" class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="editarPerfilLabel">Editar Perfil</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+              <div class="mb-3">
+                  <label for="nombre" class="form-label">Nombre</label>
+                  <input type="text" class="form-control" name="nombre" 
+                        value="{{ data.name.split()[0] if data and data.name else '' }}">
+              </div>
+              <div class="mb-3">
+                  <label for="apellido" class="form-label">Apellido</label>
+                  <input type="text" class="form-control" name="apellido" 
+                        value="{{ data.name.split()[1] if data and data.name and data.name.split()|length > 1 else '' }}">
+              </div>
+              <div class="mb-3">
+                  <label for="telefono" class="form-label">Teléfono</label>
+                  <input type="text" class="form-control" name="telefono" 
+                        value="{{ data.phone if data and data.phone else '' }}">
+              </div>
+              <div class="mb-3">
+                  <label for="direccion" class="form-label">Dirección</label>
+                  <textarea class="form-control" name="direccion">{{ data.address if data and data.address else '' }}</textarea>
+              </div>
+              </div>
+
+              <div class="modal-footer">
+                <button type="submit" class="btn btn-primary">Guardar cambios</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+
+
+        <!-- Ícono de carrito -->
+        <a href="#" class="text-white fs-4" title="Carrito de compras" data-bs-toggle="offcanvas" data-bs-target="#carritoCanvas">
+          <i class="bi bi-cart-fill"></i>
+          <span class="badge bg-danger ms-1" id="cantidad-carrito">0</span>
+        </a>
+
+        <div class="offcanvas offcanvas-end" tabindex="-1" id="carritoCanvas">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title">Carrito de Compras</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+          </div>
+          <div class="offcanvas-body" id="contenido-carrito">
+            <p class="text-muted">El carrito está vacío.</p>
+          </div>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- Carrito de compras -->
+    <script>
+      let carrito = [];
+
+      function actualizarCarritoUI() {
+        const contenedor = document.getElementById('contenido-carrito');
+        const cantidadSpan = document.getElementById('cantidad-carrito');
+        contenedor.innerHTML = '';
+
+        if (carrito.length === 0) {
+          contenedor.innerHTML = '<p class="text-muted">El carrito está vacío.</p>';
+          cantidadSpan.textContent = '0';
+          return;
+        }
+
+        let total = 0;
+
+        carrito.forEach((item, index) => {
+          total += item.rate * item.cantidad;
+
+          const itemDiv = document.createElement('div');
+          itemDiv.className = 'card mb-3';
+          itemDiv.innerHTML = `
+            <div class="card-body py-2 d-flex justify-content-between align-items-center">
+              <div>
+                <strong>${item.nombre}</strong><br>
+                <small class="text-muted">S/${item.rate} x ${item.cantidad} = <strong>S/${(item.rate * item.cantidad).toFixed(2)}</strong></small>
+              </div>
+              <button class="btn btn-sm btn-outline-danger ms-3 eliminar-btn" data-index="${index}">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          `;
+          contenedor.appendChild(itemDiv);
+        });
+
+        const totalDiv = document.createElement('div');
+        totalDiv.className = 'text-end mt-3 border-top pt-3';
+        totalDiv.innerHTML = `<h5>Total: S/${total.toFixed(2)}</h5>`;
+        contenedor.appendChild(totalDiv);
+
+        cantidadSpan.textContent = carrito.reduce((acc, el) => acc + el.cantidad, 0);
+
+        // Agregar eventos para eliminar
+        document.querySelectorAll('.eliminar-btn').forEach(btn => {
+          btn.addEventListener('click', e => {
+            const index = parseInt(btn.dataset.index);
+            carrito.splice(index, 1);
+            actualizarCarritoUI();
+          });
+        });
+      }
+
+      function agregarAlCarrito(producto) {
+        const existente = carrito.find(p => p.id === producto.id);
+        if (existente) {
+          existente.cantidad += 1;
+        } else {
+          carrito.push({ ...producto, cantidad: 1 });
+        }
+        actualizarCarritoUI();
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        localStorage.removeItem('carrito');
+        carrito = [];
+
+        document.querySelectorAll('.btn[data-id]').forEach(btn => {
+          btn.addEventListener('click', e => {
+            e.preventDefault();
+            const card = btn.closest('.card');
+            const id = parseInt(btn.dataset.id);
+            const nombre = card.querySelector('.card-title').textContent.trim();
+            const precioTexto = card.querySelector('.card-body p').textContent.match(/S\/\d+(\.\d+)?/);
+            const rate = parseFloat(precioTexto ? precioTexto[0].replace('S/', '') : 0);
+
+            agregarAlCarrito({ id, nombre, rate });
+          });
+        });
+
+        actualizarCarritoUI();
+      });
+    </script>
+
+
+
+    <!-- Modal Login -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form action="{{ url_for('login') }}" method="post">
+            <div class="modal-header">
+              <h5 class="modal-title" id="loginModalLabel">Iniciar sesión</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="loginUsername" class="form-label">Correo electrónico</label>
+                <input type="email" class="form-control" id="loginUsername" name="correo" required>
+              </div>
+              <div class="mb-3">
+                <label for="loginPassword" class="form-label">Contraseña</label>
+                <input type="password" class="form-control" id="loginPassword" name="password" required autocomplete="current-password">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="submit" class="btn btn-primary">Entrar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Sign Up -->
+    <div class="modal fade" id="signupModal" tabindex="-1" aria-labelledby="signupModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form action="{{ url_for('registro') }}" method="post">
+      <div class="modal-header">
+        <h5 class="modal-title" id="signupModalLabel">Crear cuenta</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Campos para registro -->
+        <div class="mb-3">
+          <label for="signupNombre" class="form-label">Nombre</label>
+          <input type="text" class="form-control" id="signupNombre" name="nombre" required>
+        </div>
+        <div class="mb-3">
+          <label for="signupApellido" class="form-label">Apellido</label>
+          <input type="text" class="form-control" id="signupApellido" name="apellido" required>
+        </div>
+        <div class="mb-3">
+          <label for="signupEmail" class="form-label">Correo electrónico</label>
+          <input type="email" class="form-control" id="signupEmail" name="email" required>
+        </div>
+        <div class="mb-3">
+          <label for="signupPassword" class="form-label">Contraseña</label>
+          <input type="password" class="form-control" id="signupPassword" name="password" required autocomplete="new-password">
+        </div>
+        <div class="mb-3">
+          <label for="signupTelefono" class="form-label">Teléfono</label>
+          <input type="text" class="form-control" id="signupTelefono" name="telefono" required>
+        </div>
+        <div class="mb-3">
+          <label for="signupDireccion" class="form-label">Dirección</label>
+          <input type="text" class="form-control" id="signupDireccion" name="direccion" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-success">Crear cuenta</button>
+      </div>
+          </form>
+
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Barra de búsqueda centrada -->
+    <section class="py-4 bg-light">
+      <div class="container d-flex justify-content-center">
+        <form class="w-50" role="search" action="{{ url_for('buscar_productos') }}" method="GET">
+          <div class="input-group input-group-sm">
+            <input name="q" type="search" class="form-control rounded-start-pill" placeholder="¿Qué estás buscando?" aria-label="Buscar">
+            <button class="btn btn-danger rounded-end-pill" type="submit">Buscar</button>
+          </div>
+        </form>
+      </div>
+      <div class="container text-center mt-3">
+      <button type="button"
+            id="openCategories"
+            class="btn btn-link text-decoration-none fw-semibold text-dark"
+            data-bs-toggle="modal"
+            data-bs-target="#categoriesModal">
+      <a class="text-decoration-none fw-semibold text-dark">
+          <i class="bi bi-list me-1"></i>Ver Categorías
+        </a>
+    </button>
+      </div>
+    </section>
+
+  
+    
+    <!-- Modal Bootstrap -->
+    <div class="modal fade" id="categoriesModal" tabindex="-1" aria-labelledby="categoriesModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="categoriesModalLabel">Categorías</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body d-flex">
+            <!-- Lista de categorías -->
+          <ul id="lista-categorias" class="list-group w-25 me-3"></ul>
+          <ul id="lista-subcategorias" class="list-group w-25 me-3"></ul>
+          <div id="productos-container" class="w-50">
+            
+          </div>
+
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const categoriesModal = document.getElementById('categoriesModal');
+
+      categoriesModal.addEventListener('show.bs.modal', function () {
+        fetch('/categorias-json')
+          .then(res => res.json())
+          .then(data => {
+            const listaCategorias = document.getElementById('lista-categorias');
+            const listaSubcategorias = document.getElementById('lista-subcategorias');
+            listaCategorias.innerHTML = '';
+            listaSubcategorias.innerHTML = '';
+            data.forEach(categoria => {
+              const li = document.createElement('li');
+              li.className = 'list-group-item';
+              li.textContent = categoria.nombre;
+              li.style.cursor = 'pointer';
+              li.addEventListener('click', () => cargarSubcategorias(categoria.id_categoria, li));
+              listaCategorias.appendChild(li);
+            });
+          });
+      });
+
+      function cargarSubcategorias(id_categoria, elementoSeleccionado) {
+        document.querySelectorAll('#lista-categorias li').forEach(li => li.classList.remove('active'));
+        elementoSeleccionado.classList.add('active');
+
+        const listaSubcategorias = document.getElementById('lista-subcategorias');
+        listaSubcategorias.innerHTML = '';
+
+        fetch(`/subcategorias?id_categoria=${id_categoria}`)
+          .then(res => res.json())
+          .then(subcategorias => {
+            if (subcategorias.length === 0) {
+              listaSubcategorias.innerHTML = '<li class="list-group-item text-muted">No hay subcategorías</li>';
+              return;
+            }
+            subcategorias.forEach(sub => {
+              const li = document.createElement('li');
+              li.className = 'list-group-item';
+              li.textContent = sub.nombre;
+              li.style.cursor = 'pointer';
+              li.addEventListener('click', () => {
+                window.location.href = `/subcategoria/${sub.id_subcategoria}`;
+              });
+              listaSubcategorias.appendChild(li);
+            });
+          });
+      }
+    </script>
+</div>
+  <div class="container">
+
+<h1 class="mb-4">Productos en “{{ subcategoria }}”</h1>
+{% if productos %}
+  <div class="row g-4">
+    {% for p in productos %}
+      <div class="col-md-4">
+        <div class="card h-100">
+          <div class="p-4 text-center">
+            <img src="{{ url_for('static', filename='myimages/' ~ p.product_image) }}"
+                 alt="{{ p.product_name | e }}"
+                 class="img-fluid" style="max-height: 180px;" />
+          </div>
+          <div class="card-body">
+            <h5 class="card-title">{{ p.product_name }}</h5>
+            <p class="card-text">Precio: {{ p.rate }}<br>MRP: {{ p.mrp }}</p>
+            <a href="#" class="btn btn-outline-primary rounded-pill px-4" data-id="{{ p.product_id }}">
+              Agregar al carrito
+            </a>
+          </div>
+          <div class="card-footer bg-transparent border-0 text-center pb-4">
+            <small class="text-muted">Marca: {{ p.brand_name }}</small>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">No hay productos en esta subcategoría.</p>
+{% endif %}
+
+<a href="/" class="btn btn-secondary mt-4">← Volver al inicio</a>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

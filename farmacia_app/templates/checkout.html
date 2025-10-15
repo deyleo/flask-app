@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Finalizar compra{% endblock %}
+
+{% block content %}
+<div class="checkout-container container my-5">
+  <h2 class="text-center mb-4 titulo-seccion">Finalizar compra</h2>
+
+  <div class="row">
+    <!-- 🧾 Columna izquierda: formulario de datos -->
+    <div class="col-md-7 mb-4">
+      <div class="card shadow-sm border-0 p-4 checkout-form">
+        <h5 class="mb-3">Datos de envío</h5>
+        <form method="POST" action="{{ url_for('procesar_compra') }}">
+          <div class="mb-3">
+            <label for="nombre" class="form-label">Nombre completo</label>
+            <input type="text" class="form-control" id="nombre" name="nombre" placeholder="Tu nombre" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="direccion" class="form-label">Dirección</label>
+            <input type="text" class="form-control" id="direccion" name="direccion" placeholder="Calle, número, distrito" required>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="telefono" class="form-label">Teléfono</label>
+              <input type="tel" class="form-control" id="telefono" name="telefono" placeholder="+51 999 999 999" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="correo" class="form-label">Correo electrónico</label>
+              <input type="email" class="form-control" id="correo" name="correo" placeholder="ejemplo@correo.com" required>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="metodo_pago" class="form-label">Método de pago</label>
+            <select id="metodo_pago" name="metodo_pago" class="form-select" required>
+              <option value="">Selecciona un método</option>
+              <option value="tarjeta">Tarjeta de crédito o débito</option>
+              <option value="transferencia">Transferencia bancaria</option>
+              <option value="yape">Yape / Plin</option>
+              <option value="contra_entrega">Pago contra entrega</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="comentarios" class="form-label">Comentarios adicionales</label>
+            <textarea id="comentarios" name="comentarios" class="form-control" rows="3" placeholder="Ej. Dejar el pedido en portería o sin cebolla en la comida..."></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100 py-2">Finalizar compra</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 🛒 Columna derecha: resumen de pedido -->
+    <div class="col-md-5">
+      <div class="card shadow-sm border-0 p-4 resumen-pedido">
+        <h5 class="mb-3">Resumen del pedido</h5>
+
+        {% if carrito %}
+          <ul class="list-group mb-3">
+            {% for item in carrito %}
+              <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                  <strong>{{ item.nombre }}</strong><br>
+                  <small class="text-muted">{{ item.cantidad }} x S/. {{ item.precio }}</small>
+                </div>
+                <span class="fw-bold">S/. {{ item.cantidad * item.precio }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+
+          <div class="d-flex justify-content-between mb-2">
+            <span>Subtotal</span>
+            <span>S/. {{ subtotal }}</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span>Envío</span>
+            <span>S/. {{ envio }}</span>
+          </div>
+          <hr>
+          <div class="d-flex justify-content-between fw-bold">
+            <span>Total</span>
+            <span>S/. {{ total }}</span>
+          </div>
+        {% else %}
+          <p class="text-center text-muted">Tu carrito está vacío.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer fijo -->
+<footer class="footer">
+  <div class="container text-center py-3">
+    <p class="m-0">&copy; 2025 Farmacia Santa Rosa — Todos los derechos reservados</p>
+  </div>
+</footer>
+{% endblock %}

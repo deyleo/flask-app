@@ -1,0 +1,59 @@
+/* Estilos personalizados del buscador */
+form input[type="search"]::placeholder {
+  color: #888;
+}
+
+form input[type="search"]:focus {
+  box-shadow: 0 0 8px rgba(220, 53, 69, 0.3);
+}
+
+.btn-danger {
+  transition: 0.3s ease;
+  
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+#openCategories:hover {
+  background-color: #f8f9fa;
+  transform: scale(1.03);
+  transition: 0.2s ease-in-out;
+}
+
+/* Página de checkout */
+.checkout-container {
+  background-color: #f7f9fb;
+}
+
+.checkout-form, .resumen-pedido {
+  border-radius: 15px;
+  background-color: #fff;
+}
+
+.checkout-form h5,
+.resumen-pedido h5 {
+  color: #004aad;
+  font-weight: 600;
+}
+
+.btn-success {
+  background-color: #00a859 !important;
+  border: none;
+  transition: 0.2s;
+}
+.btn-success:hover {
+  background-color: #008a4a !important;
+}
+
+/* Footer */
+.footer {
+  background-color: #0d6efd;
+  color: white;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  font-size: 0.9rem;
+}

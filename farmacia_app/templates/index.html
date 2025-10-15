@@ -1,0 +1,447 @@
+{% extends "base.html" %}
+
+{% block title %}Santa Rosa{% endblock %}
+
+{% block content %}
+<!-- Contenedor principal -->
+<div class="contenedor_header">
+  <header class="bg-primary py-5 position-relative">
+    <div class="container text-center">
+      <h1 class="display-2 fw-bold text-white">Santa Rosa</h1>
+    </div>
+
+    <!-- Iconos de usuario y carrito en la esquina superior derecha -->
+    <div class="position-absolute top-0 end-0 p-3 d-flex align-items-center gap-3 z-3">
+      <!-- Ícono de usuario con menú desplegable -->
+      <div class="dropdown">
+        <a href="#" class="text-white fs-4" id="usuarioDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Usuario">
+          <i class="bi bi-person-circle"></i>
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end mt-2" aria-labelledby="usuarioDropdown">
+          {% if session.get('usuario') %}
+            <li><a href="{{ url_for('perfil') }}" class="dropdown-item">Mi Perfil</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('logout') }}">Cerrar sesión</a></li>
+          {% else %}
+            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#loginModal">Iniciar sesión</a></li>
+            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#signupModal">Crear cuenta</a></li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <!-- Ícono de carrito -->
+      <a href="#" class="text-white fs-4" title="Carrito de compras" data-bs-toggle="offcanvas" data-bs-target="#carritoCanvas">
+        <i class="bi bi-cart-fill"></i>
+        <span class="badge bg-danger ms-1" id="cantidad-carrito">0</span>
+      </a>
+    </div>
+  </header>
+</div>
+
+<!-- Offcanvas Carrito -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="carritoCanvas">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title">Carrito de Compras</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+  </div>
+  <div class="offcanvas-body" id="contenido-carrito">
+    <p class="text-muted">El carrito está vacío.</p>
+  </div>
+</div>
+
+<!-- Modal para editar perfil -->
+<div class="modal fade" id="editarPerfilModal" tabindex="-1" aria-labelledby="editarPerfilLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <form method="POST" class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editarPerfilLabel">Editar Perfil</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label for="nombre" class="form-label">Nombre</label>
+          <input type="text" class="form-control" name="nombre" value="{{ data.name.split()[0] if data and data.name else '' }}">
+        </div>
+        <div class="mb-3">
+          <label for="apellido" class="form-label">Apellido</label>
+          <input type="text" class="form-control" name="apellido" value="{{ data.name.split()[1] if data and data.name and data.name.split()|length > 1 else '' }}">
+        </div>
+        <div class="mb-3">
+          <label for="telefono" class="form-label">Teléfono</label>
+          <input type="text" class="form-control" name="telefono" value="{{ data.phone if data and data.phone else '' }}">
+        </div>
+        <div class="mb-3">
+          <label for="direccion" class="form-label">Dirección</label>
+          <textarea class="form-control" name="direccion">{{ data.address if data and data.address else '' }}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Mostrar mensajes flash (inline) -->
+<div class="container mt-3">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} text-center" role="alert">
+          {{ message }}
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+</div>
+ <div class="container d-flex justify-content-center">
+  <form action="{{ url_for('buscar_productos') }}" method="GET" class="w-75">
+    <div class="input-group input-group-sm" style="margin: 0 auto;">
+      <input 
+        name="q" 
+        type="search" 
+        class="form-control rounded-start-pill" 
+        placeholder="¿Qué estás buscando?" 
+        aria-label="Buscar">
+      <button class="btn btn-danger rounded-end-pill px-4" type="submit">
+        <i class="bi bi-search fs-4"></i>
+      </button>
+    </div>
+  </form>
+</div>
+<!-- Carrusel -->
+<div class="d-flex justify-content-center mt-5">
+  <div id="carouselImagenes" class="carousel slide carousel-fade shadow-sm rounded" style="width: 90vw;" data-bs-ride="carousel" data-bs-interval="3000">
+    <div class="carousel-indicators">
+      {% for banner in banners_carrusel %}
+        <button type="button" data-bs-target="#carouselImagenes" data-bs-slide-to="{{ loop.index0 }}" {% if loop.first %}class="active" aria-current="true"{% endif %}></button>
+      {% endfor %}
+    </div>
+
+    <div class="carousel-inner" style="height: 30vh;">
+      {% for banner in banners_carrusel %}
+        <div class="carousel-item {% if loop.first %}active{% endif %}">
+          <img src="{{ url_for('static', filename='banners/' ~ banner.imagen) }}" class="d-block w-100 h-100" alt="Imagen {{ loop.index }}" style="object-fit: cover;">
+        </div>
+      {% endfor %}
+    </div>
+
+    <button class="carousel-control-prev" type="button" data-bs-target="#carouselImagenes" data-bs-slide="prev">
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    </button>
+    <button class="carousel-control-next" type="button" data-bs-target="#carouselImagenes" data-bs-slide="next">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    </button>
+  </div>
+</div>
+
+<!-- Barra de búsqueda centrada -->
+<section class="py-4 bg-light" >
+
+
+  <div class="container text-center mt-3">
+    <button type="button" id="openCategories" class="btn btn-link text-decoration-none fw-semibold text-dark" data-bs-toggle="modal" data-bs-target="#categoriesModal">
+      <i class="bi bi-list me-1"></i>Ver Categorías
+    </button>
+  </div>
+</section>
+
+
+
+<!-- Modal Categorías -->
+<div class="modal fade" id="categoriesModal" tabindex="-1" aria-labelledby="categoriesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="categoriesModalLabel">Categorías</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body d-flex">
+        <ul id="lista-categorias" class="list-group w-25 me-3"></ul>
+        <ul id="lista-subcategorias" class="list-group w-25 me-3"></ul>
+        <div id="productos-container" class="w-50"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Login Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('login') }}" method="post">
+        <div class="modal-header">
+          <h5 class="modal-title" id="loginModalLabel">Iniciar sesión</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="loginUsername" class="form-label">Correo electrónico</label>
+            <input type="email" class="form-control" id="loginUsername" name="correo" required>
+          </div>
+          <div class="mb-3">
+            <label for="loginPassword" class="form-label">Contraseña</label>
+            <input type="password" class="form-control" id="loginPassword" name="password" required autocomplete="current-password">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Entrar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Signup Modal -->
+<div class="modal fade" id="signupModal" tabindex="-1" aria-labelledby="signupModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form action="{{ url_for('registro') }}" method="post">
+        <div class="modal-header">
+          <h5 class="modal-title" id="signupModalLabel">Crear cuenta</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="signupNombre" class="form-label">Nombre</label>
+            <input type="text" class="form-control" id="signupNombre" name="nombre" required>
+          </div>
+          <div class="mb-3">
+            <label for="signupApellido" class="form-label">Apellido</label>
+            <input type="text" class="form-control" id="signupApellido" name="apellido" required>
+          </div>
+          <div class="mb-3">
+            <label for="signupEmail" class="form-label">Correo electrónico</label>
+            <input type="email" class="form-control" id="signupEmail" name="email" required>
+          </div>
+          <div class="mb-3">
+            <label for="signupPassword" class="form-label">Contraseña</label>
+            <input type="password" class="form-control" id="signupPassword" name="password" required autocomplete="new-password">
+          </div>
+          <div class="mb-3">
+            <label for="signupTelefono" class="form-label">Teléfono</label>
+            <input type="text" class="form-control" id="signupTelefono" name="telefono" required>
+          </div>
+          <div class="mb-3">
+            <label for="signupDireccion" class="form-label">Dirección</label>
+            <input type="text" class="form-control" id="signupDireccion" name="direccion" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-success">Crear cuenta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Contenido principal - Productos -->
+<div class="container-fluid mt-0">
+  <div class="row gx-5 justify-content-center">
+    <section class="col-lg-12">
+      <div class="row g-4" style="max-width: 80vw; margin: 0 auto;">
+        {% if products %}
+          <div class="row g-4">
+            {% for pucto in products %}
+              {% if loop.index0 != 0 and (loop.index0 % 6) == 0 and (banners_estaticos|length > 0) %}
+                {% set banner_index = ((loop.index0 // 6 - 1) % (banners_estaticos|length)) %}
+                <div class="col-12">
+                  <img src="{{ url_for('static', filename='banners/' ~ banners_estaticos[banner_index].imagen) }}" alt="Banner destacado" class="img-fluid my-4 rounded shadow-sm" />
+                </div>
+              {% endif %}
+
+              <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm position-relative">
+                  {% if pucto.recomendado %}
+                    <span class="badge bg-success position-absolute" style="top: 10px; right: 10px; font-size: 0.8rem;">Recomendado</span>
+                  {% endif %}
+
+                  <div class="p-4 text-center">
+                    <img src="{{ url_for('static', filename='myimages/' ~ pucto.product_image) }}" alt="{{ pucto.product_name | e }}" class="img-fluid" style="max-height: 180px;" />
+                  </div>
+
+                  <div class="card-body text-center">
+                    <h5 class="card-title fw-semibold">{{ pucto.product_name }}</h5>
+
+                    {% if pucto.mrp and pucto.mrp != pucto.rate %}
+                      <p class="text-danger fs-5 mb-2">
+                        S/ {{ pucto.rate }}
+                        <span class="text-muted text-decoration-line-through fs-6">S/ {{ pucto.mrp }}</span>
+                      </p>
+                    {% else %}
+                      <p class="text-danger fs-5 mb-2">S/ {{ pucto.rate }}</p>
+                    {% endif %}
+
+                    <a href="#" class="btn btn-outline-primary rounded-pill px-4"
+                       data-id="{{ pucto.product_id }}"
+                       data-rate="{{ pucto.rate }}"
+                       data-nombre="{{ pucto.product_name }}">
+                      Agregar al carrito
+                    </a>
+                  </div>
+
+                  <div class="card-footer bg-transparent border-0 text-center pb-4">
+                    <small class="text-muted">Marca: {{ pucto.brand_name }}</small>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p>No hay productos para mostrar.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+  /* Carrito - lógica intacta */
+  let carrito = [];
+
+  function actualizarCarritoUI() {
+  const contenedor = document.getElementById('contenido-carrito');
+  const cantidadSpan = document.getElementById('cantidad-carrito');
+  if (!contenedor || !cantidadSpan) return;
+  contenedor.innerHTML = '';
+
+  if (carrito.length === 0) {
+    contenedor.innerHTML = '<p class="text-muted">El carrito está vacío.</p>';
+    cantidadSpan.textContent = '0';
+    return;
+  }
+
+  let total = 0;
+  carrito.forEach((item, index) => {
+    total += item.rate * item.cantidad;
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'card mb-3';
+    itemDiv.innerHTML = `
+      <div class="card-body py-2 d-flex justify-content-between align-items-center">
+        <div>
+          <strong>${item.nombre}</strong><br>
+          <small class="text-muted">S/${item.rate} x ${item.cantidad} = <strong>S/${(item.rate * item.cantidad).toFixed(2)}</strong></small>
+        </div>
+        <button class="btn btn-sm btn-outline-danger ms-3 eliminar-btn" data-index="${index}">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    `;
+    contenedor.appendChild(itemDiv);
+  });
+
+  // 🔹 Total
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'text-end mt-3 border-top pt-3';
+  totalDiv.innerHTML = `<h5>Total: S/${total.toFixed(2)}</h5>`;
+  contenedor.appendChild(totalDiv);
+
+  // 🔹 Botón de finalizar compra
+  const finalizarBtn = document.createElement('button');
+  finalizarBtn.className = 'btn btn-primary w-100 mt-3 ';
+  finalizarBtn.textContent = 'Finalizar compra';
+  finalizarBtn.addEventListener('click', () => {
+    // Guardar carrito en localStorage antes de redirigir
+    localStorage.setItem('carrito', JSON.stringify(carrito));
+    window.location.href = '/checkout'; // Cambia esta ruta si tu página se llama diferente
+  });
+  contenedor.appendChild(finalizarBtn);
+
+  cantidadSpan.textContent = carrito.reduce((acc, el) => acc + el.cantidad, 0);
+
+  document.querySelectorAll('.eliminar-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const index = parseInt(btn.dataset.index);
+      carrito.splice(index, 1);
+      actualizarCarritoUI();
+    });
+  });
+}
+
+
+  function agregarAlCarrito(producto) {
+    const existente = carrito.find(p => p.id === producto.id);
+    if (existente) {
+      existente.cantidad += 1;
+    } else {
+      carrito.push({ ...producto, cantidad: 1 });
+    }
+    actualizarCarritoUI();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    // Si quieres persistencia en el futuro, quita la línea siguiente
+    localStorage.removeItem('carrito');
+    carrito = [];
+
+    document.querySelectorAll('.btn[data-id]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.preventDefault();
+        const id = parseInt(btn.dataset.id);
+        const nombre = btn.dataset.nombre;
+        const rate = parseFloat(btn.dataset.rate);
+        agregarAlCarrito({ id, nombre, rate });
+      });
+    });
+
+    actualizarCarritoUI();
+  });
+
+  /* Categorías - lógica intacta */
+  document.addEventListener('DOMContentLoaded', () => {
+    const categoriesModal = document.getElementById('categoriesModal');
+    if (categoriesModal) {
+      categoriesModal.addEventListener('show.bs.modal', function () {
+        fetch('/categorias-json')
+          .then(res => res.json())
+          .then(data => {
+            const listaCategorias = document.getElementById('lista-categorias');
+            const listaSubcategorias = document.getElementById('lista-subcategorias');
+            if (!listaCategorias || !listaSubcategorias) return;
+            listaCategorias.innerHTML = '';
+            listaSubcategorias.innerHTML = '';
+            data.forEach(categoria => {
+              const li = document.createElement('li');
+              li.className = 'list-group-item';
+              li.textContent = categoria.nombre;
+              li.style.cursor = 'pointer';
+              li.addEventListener('click', () => cargarSubcategorias(categoria.id_categoria, li));
+              listaCategorias.appendChild(li);
+            });
+          });
+      });
+    }
+  });
+
+  function cargarSubcategorias(id_categoria, elementoSeleccionado) {
+    document.querySelectorAll('#lista-categorias li').forEach(li => li.classList.remove('active'));
+    elementoSeleccionado.classList.add('active');
+
+    const listaSubcategorias = document.getElementById('lista-subcategorias');
+    if (!listaSubcategorias) return;
+    listaSubcategorias.innerHTML = '';
+
+    fetch(`/subcategorias?id_categoria=${id_categoria}`)
+      .then(res => res.json())
+      .then(subcategorias => {
+        if (subcategorias.length === 0) {
+          listaSubcategorias.innerHTML = '<li class="list-group-item text-muted">No hay subcategorías</li>';
+          return;
+        }
+        subcategorias.forEach(sub => {
+          const li = document.createElement('li');
+          li.className = 'list-group-item';
+          li.textContent = sub.nombre;
+          li.style.cursor = 'pointer';
+          li.addEventListener('click', () => {
+            window.location.href = `/subcategoria/${sub.id_subcategoria}`;
+          });
+          listaSubcategorias.appendChild(li);
+        });
+      });
+  }
+</script>
+{% endblock %}
