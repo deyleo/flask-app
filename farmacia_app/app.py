@@ -1,35 +1,37 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-import pymysql
+import psycopg2
+import psycopg2.extras
 import bcrypt
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+import os
 
 # --- Inicializar la app primero ---
+# --- Inicializar la app primero ---
 app = Flask(__name__)
-app.secret_key = 'tu_clave_secreta'  # 🔹 genera una con secrets.token_hex(16)
+app.secret_key = os.getenv('SECRET_KEY', 'clave_predeterminada_segura')  # 🔹 Usar variable de entorno en Render
 
 # --- Configuración del correo ---
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
 app.config['MAIL_PORT'] = 587
 app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'soporte.farmaciasantarosa@gmail.com'  # 🔹 cámbialo
-app.config['MAIL_PASSWORD'] = 'jrhw mhzx jdcg rtdf'  # 🔹 usa clave de aplicación de Gmail, no tu contraseña
-app.config['MAIL_DEFAULT_SENDER'] = 'soporte.farmaciasantarosa@gmail.com'
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')  # 🔹 Gmail o correo configurado
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')  # 🔹 Contraseña o app password de Gmail
+app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'soporte.farmaciasantarosa@gmail.com')
 
 # --- Inicializar extensiones ---
 mail = Mail(app)
 s = URLSafeTimedSerializer(app.secret_key)
 
-
-# --- Conexión con la base de datos ---
 def get_db_connection():
-    return pymysql.connect(
-        host='localhost',
-        user='root',
-        password='',
-        db='farmacia',
-        charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor
+    DATABASE_URL = os.getenv(
+        "DATABASE_URL",
+        "postgresql://farmacia:SrpN7Wutmfu1VKhjFcI2XnNPTO8GOn3m@dpg-d3nlqcjuibrs738h64v0-a/farmacia_q46p"
+    )
+    return psycopg2.connect(
+        DATABASE_URL,
+        sslmode="require",
+        cursor_factory=psycopg2.extras.RealDictCursor
     )
 
 
@@ -163,7 +165,8 @@ def registro():
         flash('✅ Registro exitoso. Revisa tu correo para verificar tu cuenta.', 'success')
         return redirect(url_for('index'))
 
-    except pymysql.err.IntegrityError:
+    except psycopg2.IntegrityError:
+
         # 🔹 Error cuando el correo ya existe
         flash('⚠️ El correo ya está registrado. Intenta con otro o inicia sesión.', 'danger')
         return redirect(url_for('index'))
@@ -321,18 +324,17 @@ def checkout():
 
 @app.route('/procesar_compra', methods=['POST'])
 def procesar_compra():
-    if 'user_id' not in session:
+    if 'usuario_id' not in session:
         flash('Debes iniciar sesión para continuar', 'warning')
-        return redirect(url_for('login'))
+        return redirect(url_for('index', _anchor='loginModal'))
 
-    user_id = session['user_id']
+    user_id = session['usuario_id']
     metodo_pago = request.form['metodo_pago']
     comentarios = request.form.get('comentarios', '')
 
-    conn = pymysql.connect(host='localhost', user='root', password='', db='farmacia')
-    cursor = conn.cursor(pymysql.cursors.DictCursor)
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    # 🛒 Obtener productos del carrito del usuario
     cursor.execute("""
         SELECT p.product_id, p.mrp AS precio, c.cantidad
         FROM carrito c
@@ -347,21 +349,19 @@ def procesar_compra():
 
     total = sum(p['precio'] * p['cantidad'] for p in productos)
 
-    # 💾 Insertar en orders
     cursor.execute("""
         INSERT INTO orders (client_id, total_amount, payment_method, notes)
         VALUES (%s, %s, %s, %s)
     """, (user_id, total, metodo_pago, comentarios))
-    order_id = cursor.lastrowid
+    cursor.execute("SELECT LASTVAL()")
+    order_id = cursor.fetchone()['lastval']
 
-    # 💾 Insertar productos en order_item
     for p in productos:
         cursor.execute("""
             INSERT INTO order_item (order_id, product_id, quantity)
             VALUES (%s, %s, %s)
         """, (order_id, p['product_id'], p['cantidad']))
 
-    # 🧹 Vaciar carrito
     cursor.execute("DELETE FROM carrito WHERE id_cliente = %s", (user_id,))
 
     conn.commit()
