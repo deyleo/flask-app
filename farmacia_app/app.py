@@ -26,7 +26,7 @@ s = URLSafeTimedSerializer(app.secret_key)
 def get_db_connection():
     DATABASE_URL = os.getenv(
         "DATABASE_URL",
-        "postgresql://farmacia:...@host/farmacia_q46p"
+        "postgresql://farmacia:SrpN7Wutmfu1VKhjFcI2XnNPTO8GOn3m@dpg-d3nlqcjuibrs738h64v0-a.oregon-postgres.render.com/farmacia_q46p"
     )
     conn = psycopg.connect(DATABASE_URL, autocommit=True, row_factory=psycopg.rows.dict_row)
     return conn
