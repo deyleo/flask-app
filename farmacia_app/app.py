@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-import psycopg2
-import psycopg2.extras
+from psycopg.errors import UniqueViolation 
+import psycopg
 import bcrypt
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
@@ -26,14 +26,10 @@ s = URLSafeTimedSerializer(app.secret_key)
 def get_db_connection():
     DATABASE_URL = os.getenv(
         "DATABASE_URL",
-        "postgresql://farmacia:SrpN7Wutmfu1VKhjFcI2XnNPTO8GOn3m@dpg-d3nlqcjuibrs738h64v0-a/farmacia_q46p"
+        "postgresql://farmacia:...@host/farmacia_q46p"
     )
-    return psycopg2.connect(
-        DATABASE_URL,
-        sslmode="require",
-        cursor_factory=psycopg2.extras.RealDictCursor
-    )
-
+    conn = psycopg.connect(DATABASE_URL, autocommit=True, row_factory=psycopg.rows.dict_row)
+    return conn
 
 # --- Cierre de sesión ---
 @app.route('/logout')
@@ -165,11 +161,10 @@ def registro():
         flash('✅ Registro exitoso. Revisa tu correo para verificar tu cuenta.', 'success')
         return redirect(url_for('index'))
 
-    except psycopg2.IntegrityError:
-
-        # 🔹 Error cuando el correo ya existe
+    except UniqueViolation:
         flash('⚠️ El correo ya está registrado. Intenta con otro o inicia sesión.', 'danger')
         return redirect(url_for('index'))
+
 
     except Exception as e:
         # 🔹 Cualquier otro error inesperado
