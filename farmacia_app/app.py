@@ -186,8 +186,8 @@ def categorias():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM categories WHERE activo=1")
-            categorias = cursor.fetchall()
+           cursor.execute("SELECT * FROM categories WHERE activo=TRUE")
+        categorias = cursor.fetchall()
     finally:
         connection.close()
     return render_template('categorias.html', categorias=categorias)
@@ -197,7 +197,7 @@ def index():
     try:
         with connection.cursor() as cursor:
             # Categorías
-            cursor.execute("SELECT id_categoria, nombre FROM categories WHERE activo = 1")
+            cursor.execute("SELECT id_categoria, nombre FROM categories WHERE activo = TRUE")
             categories = cursor.fetchall()
 
             # Productos
@@ -212,7 +212,7 @@ def index():
             # Banners tipo 'carrusel'
             cursor.execute("""
                 SELECT imagen FROM banners 
-                WHERE activo = 1 AND tipo = 'carrusel'
+                WHERE activo = TRUE AND tipo = 'carrusel'
                 ORDER BY orden ASC
             """)
             banners_carrusel = cursor.fetchall()
@@ -220,7 +220,7 @@ def index():
             # Banners tipo 'banner' (intercalados entre productos)
             cursor.execute("""
                 SELECT imagen FROM banners 
-                WHERE activo = 1 AND tipo = 'banner'
+                WHERE activo = TRUE AND tipo = 'banner'
                 ORDER BY orden ASC
             """)
             banners_estaticos = cursor.fetchall()
