@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
-from psycopg.errors import UniqueViolation 
-import psycopg
+import pymysql
+from pymysql.err import IntegrityError
 import bcrypt
 from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
@@ -24,17 +24,24 @@ mail = Mail(app)
 s = URLSafeTimedSerializer(app.secret_key)
 
 def get_db_connection():
-    DATABASE_URL = os.getenv(
-        "DATABASE_URL",
-        "postgresql://farmacia:SrpN7Wutmfu1VKhjFcI2XnNPTO8GOn3m@dpg-d3nlqcjuibrs738h64v0-a.oregon-postgres.render.com/farmacia_q46p"
+    conn = pymysql.connect(
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASS"),
+        database=os.getenv("DB_NAME"),
+        cursorclass=pymysql.cursors.DictCursor,
+        autocommit=True
     )
-    conn = psycopg.connect(DATABASE_URL, autocommit=True, row_factory=psycopg.rows.dict_row)
     return conn
+
+
+
 
 # --- Cierre de sesión ---
 @app.route('/logout')
 def logout():
     session.pop('usuario', None)
+    session.pop('usuario_id', None)
     flash('Sesión cerrada correctamente.', 'success')
     return redirect(url_for('index'))
 
@@ -75,26 +82,32 @@ def perfil():
         return redirect(url_for('index', _anchor='loginModal'))
 
     conn = get_db_connection()
-    cursor = conn.cursor()
 
-    if request.method == 'POST':
-        nombre = request.form['nombre']
-        apellido = request.form['apellido']
-        telefono = request.form['telefono']
-        direccion = request.form['direccion']
+    try:
+        with conn.cursor() as cursor:
 
-        cursor.execute('''
-            UPDATE cliente 
-            SET nombre = %s, apellido = %s, telefono = %s, direccion = %s 
-            WHERE id_cliente = %s
-        ''', (nombre, apellido, telefono, direccion, session['usuario_id']))
-        conn.commit()
-        flash("Perfil actualizado correctamente", "success")
+            # Si se envió el formulario, actualizar datos
+            if request.method == 'POST':
+                nombre = request.form['nombre']
+                apellido = request.form['apellido']
+                telefono = request.form['telefono']
+                direccion = request.form['direccion']
 
-    cursor.execute('SELECT * FROM cliente WHERE id_cliente = %s', (session['usuario_id'],))
-    user = cursor.fetchone()
-    cursor.close()
-    conn.close()
+                cursor.execute('''
+                    UPDATE cliente 
+                    SET nombre = %s, apellido = %s, telefono = %s, direccion = %s 
+                    WHERE id_cliente = %s
+                ''', (nombre, apellido, telefono, direccion, session['usuario_id']))
+
+                conn.commit()
+                flash("Perfil actualizado correctamente", "success")
+
+            # Obtener datos del usuario
+            cursor.execute('SELECT * FROM cliente WHERE id_cliente = %s', (session['usuario_id'],))
+            user = cursor.fetchone()
+
+    finally:
+        conn.close()
 
     return render_template('perfil.html', data={
         'name': f"{user['nombre']} {user['apellido']}",
@@ -104,7 +117,6 @@ def perfil():
         'bio': 'Aquí puedes escribir tu biografía.',
         'profile_image': None
     })
-
 
 # --- Confirmación de correo ---
 @app.route('/confirmar/<token>')
@@ -161,7 +173,8 @@ def registro():
         flash('✅ Registro exitoso. Revisa tu correo para verificar tu cuenta.', 'success')
         return redirect(url_for('index'))
 
-    except UniqueViolation:
+    except IntegrityError:
+
         flash('⚠️ El correo ya está registrado. Intenta con otro o inicia sesión.', 'danger')
         return redirect(url_for('index'))
 
@@ -186,11 +199,14 @@ def categorias():
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
-           cursor.execute("SELECT * FROM categories WHERE activo=TRUE")
-        categorias = cursor.fetchall()
+            cursor.execute("SELECT * FROM categories WHERE activo = TRUE")
+            categorias = cursor.fetchall()
+
     finally:
         connection.close()
     return render_template('categorias.html', categorias=categorias)
+
+
 @app.route('/')
 def index():
     connection = get_db_connection()
@@ -328,37 +344,42 @@ def procesar_compra():
     comentarios = request.form.get('comentarios', '')
 
     conn = get_db_connection()
-    cursor = conn.cursor()
+    with conn.cursor() as cursor:
 
-    cursor.execute("""
-        SELECT p.product_id, p.mrp AS precio, c.cantidad
-        FROM carrito c
-        JOIN product p ON c.id_producto = p.product_id
-        WHERE c.id_cliente = %s
-    """, (user_id,))
-    productos = cursor.fetchall()
-
-    if not productos:
-        flash('Tu carrito está vacío.', 'warning')
-        return redirect(url_for('carrito'))
-
-    total = sum(p['precio'] * p['cantidad'] for p in productos)
-
-    cursor.execute("""
-        INSERT INTO orders (client_id, total_amount, payment_method, notes)
-        VALUES (%s, %s, %s, %s)
-    """, (user_id, total, metodo_pago, comentarios))
-    cursor.execute("SELECT LASTVAL()")
-    order_id = cursor.fetchone()['lastval']
-
-    for p in productos:
+        # Obtener productos del carrito
         cursor.execute("""
-            INSERT INTO order_item (order_id, product_id, quantity)
-            VALUES (%s, %s, %s)
-        """, (order_id, p['product_id'], p['cantidad']))
+            SELECT p.product_id, p.mrp AS precio, c.cantidad
+            FROM carrito c
+            JOIN product p ON c.id_producto = p.product_id
+            WHERE c.id_cliente = %s
+        """, (user_id,))
+        productos = cursor.fetchall()
 
-    cursor.execute("DELETE FROM carrito WHERE id_cliente = %s", (user_id,))
+        if not productos:
+            flash('Tu carrito está vacío.', 'warning')
+            return redirect(url_for('carrito'))
 
+        # Total
+        total = sum(p['precio'] * p['cantidad'] for p in productos)
+
+        # Crear orden
+        cursor.execute("""
+            INSERT INTO orders (client_id, total_amount, payment_method, notes)
+            VALUES (%s, %s, %s, %s)
+        """, (user_id, total, metodo_pago, comentarios))
+        order_id = cursor.lastrowid
+
+        # Agregar ítems a la orden
+        for p in productos:
+            cursor.execute("""
+                INSERT INTO order_item (order_id, product_id, quantity)
+                VALUES (%s, %s, %s)
+            """, (order_id, p['product_id'], p['cantidad']))
+
+        # Vaciar carrito
+        cursor.execute("DELETE FROM carrito WHERE id_cliente = %s", (user_id,))
+
+    # Confirmar cambios
     conn.commit()
     conn.close()
 
