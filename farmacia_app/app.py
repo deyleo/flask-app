@@ -6,23 +6,31 @@ from flask_mail import Mail, Message
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 import os
 
+
 # --- Inicializar la app primero ---
-# --- Inicializar la app primero ---
+
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'clave_predeterminada_segura')  # 🔹 Usar variable de entorno en Render
 
-# --- Configuración del correo ---
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')  # 🔹 Gmail o correo configurado
-app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')  # 🔹 Contraseña o app password de Gmail
-app.config['MAIL_DEFAULT_SENDER'] = os.getenv('MAIL_DEFAULT_SENDER', 'soporte.farmaciasantarosa@gmail.com')
+# --- Configurar secret_key para sesiones y flash ---
 
-# --- Inicializar extensiones ---
-mail = Mail(app)
+app.secret_key = os.getenv('SECRET_KEY', '3f9d8b7a1c2e4f6d9a0b8c1e2f3a4d5b6c7e8f9a0d1b2c3e4f5a6b7c8d9e0f1a')
+from itsdangerous import URLSafeTimedSerializer
 s = URLSafeTimedSerializer(app.secret_key)
 
+# --- Configuración de correo ---
+app.config.update(
+    MAIL_SERVER='smtp.gmail.com',
+    MAIL_PORT=587,
+    MAIL_USE_TLS=True,
+    MAIL_USERNAME=os.getenv('MAIL_USERNAME'),
+    MAIL_PASSWORD=os.getenv('MAIL_PASSWORD'),
+    MAIL_DEFAULT_SENDER=os.getenv('MAIL_DEFAULT_SENDER')
+)
+
+# --- Inicializar Mail ---
+mail = Mail(app)
+
+# --- Función para conexión a la base de datos ---
 def get_db_connection():
     conn = pymysql.connect(
         host=os.getenv("DB_HOST"),
@@ -33,9 +41,6 @@ def get_db_connection():
         autocommit=True
     )
     return conn
-
-
-
 
 # --- Cierre de sesión ---
 @app.route('/logout')
