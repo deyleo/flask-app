@@ -143,18 +143,27 @@ def confirmar_correo(token):
 # --- Registro ---
 @app.route('/registro', methods=['POST'])
 def registro():
-    nombre = request.form['nombre']
-    apellido = request.form['apellido']
-    email = request.form['email']
+    nombre = request.form['nombre'].strip()
+    apellido = request.form['apellido'].strip()
+    email = request.form['email'].strip().lower()  # 🔹 Normalizar email
     password = request.form['password']
-    telefono = request.form['telefono']
-    direccion = request.form['direccion']
+    telefono = request.form['telefono'].strip()
+    direccion = request.form['direccion'].strip()
 
     hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
     connection = get_db_connection()
     try:
         with connection.cursor() as cursor:
+            # 🔹 Verificar si el correo ya existe
+            cursor.execute("SELECT id_cliente FROM cliente WHERE correo_electronico = %s", (email,))
+            existe = cursor.fetchone()
+
+            if existe:
+                flash('⚠️ El correo ya está registrado. Intenta con otro o inicia sesión.', 'danger')
+                return redirect(url_for('index'))
+
+            # 🔹 Insertar nuevo usuario
             sql = """
                 INSERT INTO cliente (nombre, apellido, correo_electronico, contrasena, telefono, direccion, verificado)
                 VALUES (%s, %s, %s, %s, %s, %s, 0)
@@ -173,20 +182,15 @@ def registro():
         flash('✅ Registro exitoso. Revisa tu correo para verificar tu cuenta.', 'success')
         return redirect(url_for('index'))
 
-    except IntegrityError:
-
-        flash('⚠️ El correo ya está registrado. Intenta con otro o inicia sesión.', 'danger')
-        return redirect(url_for('index'))
-
-
     except Exception as e:
-        # 🔹 Cualquier otro error inesperado
+        # 🔹 Cualquier error inesperado
         print("Error durante el registro:", e)
         flash('❌ Ocurrió un error inesperado. Intenta nuevamente.', 'danger')
         return redirect(url_for('index'))
 
     finally:
         connection.close()
+
 
 
 @app.route('/carrito')
