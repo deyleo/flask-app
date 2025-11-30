@@ -156,12 +156,13 @@ def registro():
     try:
         with connection.cursor() as cursor:
             # 🔹 Verificar si el correo ya existe
-            cursor.execute("SELECT id_cliente FROM cliente WHERE correo_electronico = %s", (email,))
-            existe = cursor.fetchone()
+            cursor.execute("SELECT COUNT(*) AS cantidad FROM cliente WHERE correo_electronico = %s", (email,))
+            existe = cursor.fetchone()['cantidad']
 
-            if existe:
+            if existe > 0:
                 flash('⚠️ El correo ya está registrado. Intenta con otro o inicia sesión.', 'danger')
                 return redirect(url_for('index'))
+
 
             # 🔹 Insertar nuevo usuario
             sql = """
