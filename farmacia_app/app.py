@@ -143,55 +143,64 @@ def confirmar_correo(token):
 # --- Registro ---
 @app.route('/registro', methods=['POST'])
 def registro():
-    nombre = request.form['nombre'].strip()
-    apellido = request.form['apellido'].strip()
-    email = request.form['email'].strip().lower()  # 🔹 Normalizar email
-    password = request.form['password']
-    telefono = request.form['telefono'].strip()
-    direccion = request.form['direccion'].strip()
+    nombre = request.form.get('nombre', '').strip()
+    apellido = request.form.get('apellido', '').strip()
+    email = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '')
+    telefono = request.form.get('telefono', '').strip()
+    direccion = request.form.get('direccion', '').strip()
 
-    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+    # --- Validación básica ---
+    if not all([nombre, apellido, email, password]):
+        flash('Completa todos los campos.', 'warning')
+        return redirect(url_for('index'))
+    if len(password) < 6:
+        flash('La contraseña debe tener al menos 6 caracteres.', 'warning')
+        return redirect(url_for('index'))
+    import re
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        flash('Correo electrónico inválido.', 'warning')
+        return redirect(url_for('index'))
 
-    connection = get_db_connection()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+    conn = get_db_connection()
     try:
-        with connection.cursor() as cursor:
-            # 🔹 Verificar si el correo ya existe
-            cursor.execute("SELECT COUNT(*) AS cantidad FROM cliente WHERE correo_electronico = %s", (email,))
-            existe = cursor.fetchone()['cantidad']
-
-            if existe > 0:
+        with conn.cursor() as cursor:
+            try:
+                # Intentar insertar: si la columna correo_electronico tiene UNIQUE,
+                # un intento duplicado lanzará IntegrityError.
+                cursor.execute("""
+                    INSERT INTO cliente (nombre, apellido, correo_electronico, contrasena, telefono, direccion, verificado)
+                    VALUES (%s, %s, %s, %s, %s, %s, 0)
+                """, (nombre, apellido, email, hashed, telefono, direccion))
+                conn.commit()
+            except IntegrityError:
+                conn.rollback()
                 flash('⚠️ El correo ya está registrado. Intenta con otro o inicia sesión.', 'danger')
                 return redirect(url_for('index'))
 
+        # --- Enviar correo sin bloquear el registro ---
+        try:
+            token = s.dumps(email, salt='email-confirm')
+            link = url_for('confirmar_correo', token=token, _external=True)
+            msg = Message('Confirma tu cuenta en FarmaciaApp', recipients=[email])
+            msg.body = f'Hola {nombre}, haz clic en este enlace para verificar tu cuenta:\n\n{link}'
+            mail.send(msg)
+            flash('✅ Registro exitoso. Revisa tu correo para verificar tu cuenta.', 'success')
+        except Exception as mail_err:
+            app.logger.error("Error enviando correo a %s: %s", email, mail_err)
+            flash('⚠️ Registro exitoso, pero no se pudo enviar el correo de verificación.', 'warning')
 
-            # 🔹 Insertar nuevo usuario
-            sql = """
-                INSERT INTO cliente (nombre, apellido, correo_electronico, contrasena, telefono, direccion, verificado)
-                VALUES (%s, %s, %s, %s, %s, %s, 0)
-            """
-            cursor.execute(sql, (nombre, apellido, email, hashed.decode('utf-8'), telefono, direccion))
-            connection.commit()
-
-        # --- Enviar correo de verificación ---
-        token = s.dumps(email, salt='email-confirm')
-        link = url_for('confirmar_correo', token=token, _external=True)
-
-        msg = Message('Confirma tu cuenta en FarmaciaApp', recipients=[email])
-        msg.body = f'Hola {nombre}, haz clic en este enlace para verificar tu cuenta:\n\n{link}'
-        mail.send(msg)
-
-        flash('✅ Registro exitoso. Revisa tu correo para verificar tu cuenta.', 'success')
         return redirect(url_for('index'))
 
     except Exception as e:
-        # 🔹 Cualquier error inesperado
-        print("Error durante el registro:", e)
+        app.logger.exception("Error general en registro:")
         flash('❌ Ocurrió un error inesperado. Intenta nuevamente.', 'danger')
         return redirect(url_for('index'))
 
     finally:
-        connection.close()
-
+        conn.close()
 
 
 @app.route('/carrito')
